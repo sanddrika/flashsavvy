@@ -1,18 +1,31 @@
-const express = require("express");
-const sqlite3 = require("sqlite3").verbose();
-const path = require("path");
+import express from "express";
+import sqlite3 from "sqlite3";
+import path from "path";
+import bcrypt from "bcrypt";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const app = express();
-const bcrypt = require("bcrypt");
 const PORT = 3000;
 
 // Middleware
 app.use(express.json());
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: 'Something broke!' });
+});
+
 // SQLite DB setup inside server folder
 const dbPath = path.join(__dirname, "flashsavvy.db");
 const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) console.error("Database error:", err);
-  else console.log("Connected to SQLite database.");
+  if (err) {
+    console.error("Database error:", err);
+  } else {
+    console.log("Connected to SQLite database.");
+  }
 });
 
 // Create tables
@@ -53,8 +66,11 @@ db.serialize(() => {
 // Routes
 app.get("/products", (req, res) => {
   db.all(`SELECT * FROM products`, [], (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows);
+    if (err) {
+      console.error("Error fetching products:", err);
+      return res.status(500).json({ error: err.message });
+    }
+    res.json({ success: true, data: rows });
   });
 });
 
@@ -111,14 +127,22 @@ app.post("/seed", (req, res) => {
     ["Sneakers", "Lightweight running shoes", 59.99, 75],
   ];
 
-  const stmt = db.prepare(
-    `INSERT INTO products (name, description, price, stock) VALUES (?, ?, ?, ?)`
-  );
-  products.forEach((p) => stmt.run(p));
-  stmt.finalize((err) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json({ message: "Products seeded" });
-  });
+  try {
+    const stmt = db.prepare(
+      `INSERT INTO products (name, description, price, stock) VALUES (?, ?, ?, ?)`
+    );
+    products.forEach((p) => stmt.run(p));
+    stmt.finalize((err) => {
+      if (err) {
+        console.error("Error seeding products:", err);
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({ success: true, message: "Products seeded successfully" });
+    });
+  } catch (err) {
+    console.error("Error preparing statement:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.listen(PORT, () => {

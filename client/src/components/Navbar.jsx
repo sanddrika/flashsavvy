@@ -20,19 +20,19 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-[#2502cc] shadow-lg">
+    <nav className="bg-[#2C1810] shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex">
             <div className="flex-shrink-0 flex items-center">
-              <Link to="/" className="text-xl font-bold text-white hover:text-[#0366cc] transition-colors duration-200">
+              <Link to="/" className="text-xl font-bold text-amber-50 hover:text-amber-200 transition-colors duration-200">
                 ⚡ FlashSavvy
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
               <Link
                 to="/"
-                className="inline-flex items-center px-3 py-2 text-white hover:text-[#0366cc] hover:bg-[#2502cc]/90 rounded-md transition-all duration-200"
+                className="inline-flex items-center px-3 py-2 text-amber-50 hover:text-amber-200 hover:bg-[#3D241A] rounded-md transition-all duration-200"
               >
                 <HomeIcon className="h-5 w-5 mr-1" />
                 Home
@@ -40,7 +40,7 @@ const Navbar = () => {
               {isAdmin && (
                 <Link
                   to="/admin"
-                  className="inline-flex items-center px-3 py-2 text-white hover:text-[#0366cc] hover:bg-[#2502cc]/90 rounded-md transition-all duration-200"
+                  className="inline-flex items-center px-3 py-2 text-amber-50 hover:text-amber-200 hover:bg-[#3D241A] rounded-md transition-all duration-200"
                 >
                   <ShieldCheckIcon className="h-5 w-5 mr-1" />
                   Admin
@@ -57,10 +57,10 @@ const Navbar = () => {
               >
                 <div className="relative">
                   <ShoppingBagIcon 
-                    className="h-7 w-7 text-white group-hover:text-[#0366cc] transition-colors duration-200" 
+                    className="h-7 w-7 text-amber-50 group-hover:text-amber-200 transition-colors duration-200" 
                   />
                   {totalItems > 0 && (
-                    <span className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center bg-red-500 text-white text-xs font-bold rounded-full animate-pulse">
+                    <span className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center bg-[#8B4513] text-white text-xs font-bold rounded-full animate-pulse">
                       {totalItems}
                     </span>
                   )}
@@ -70,13 +70,13 @@ const Navbar = () => {
             <div className="flex items-center">
               {user ? (
                 <div className="flex items-center space-x-4">
-                  <div className="flex items-center space-x-2 text-white hover:text-[#0366cc] transition-colors duration-200">
+                  <div className="flex items-center space-x-2 text-amber-50 hover:text-amber-200 transition-colors duration-200">
                     <UserCircleIcon className="h-6 w-6" />
                     <span className="text-sm font-medium">Profile</span>
                   </div>
                   <button
                     onClick={handleLogout}
-                    className="px-4 py-2 text-sm font-medium text-white hover:text-[#0366cc] hover:bg-[#2502cc]/90 rounded-md transition-all duration-200"
+                    className="px-4 py-2 text-sm font-medium text-amber-50 hover:text-amber-200 hover:bg-[#3D241A] rounded-md transition-all duration-200"
                   >
                     Logout
                   </button>
@@ -85,13 +85,13 @@ const Navbar = () => {
                 <div className="space-x-4">
                   <Link
                     to="/login"
-                    className="text-white hover:text-[#0366cc] transition-colors duration-200"
+                    className="text-amber-50 hover:text-amber-200 transition-colors duration-200"
                   >
                     Login
                   </Link>
                   <Link
                     to="/register"
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#0366cc] hover:bg-[#0366cc]/90 transition-all duration-200 shadow-md hover:shadow-lg"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#8B4513] hover:bg-[#6B3410] transition-all duration-200 shadow-md hover:shadow-lg"
                   >
                     Register
                   </Link>

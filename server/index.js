@@ -11,6 +11,27 @@ const PORT = 3000;
 
 // Middleware
 app.use(express.json());
+app.use(express.static('public')); // Serve static files
+
+// CORS Middleware
+app.use((req, res, next) => {
+  const allowedOrigins = ['http://localhost:3001', 'http://localhost:3002'];
+  const origin = req.headers.origin;
+  
+  if (allowedOrigins.includes(origin)) {
+    res.header('Access-Control-Allow-Origin', origin);
+  }
+  
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -34,7 +55,8 @@ db.serialize(() => {
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL
+    password TEXT NOT NULL,
+    is_admin BOOLEAN DEFAULT 0
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS products (
@@ -42,7 +64,8 @@ db.serialize(() => {
     name TEXT NOT NULL,
     description TEXT,
     price REAL NOT NULL,
-    stock INTEGER NOT NULL
+    stock INTEGER NOT NULL,
+    image_url TEXT
   )`);
 
   db.run(`CREATE TABLE IF NOT EXISTS orders (
@@ -65,11 +88,13 @@ db.serialize(() => {
 
 // Routes
 app.get("/products", (req, res) => {
+  console.log("GET /products request received");
   db.all(`SELECT * FROM products`, [], (err, rows) => {
     if (err) {
       console.error("Error fetching products:", err);
       return res.status(500).json({ error: err.message });
     }
+    console.log("Products fetched successfully:", rows);
     res.json({ success: true, data: rows });
   });
 });
@@ -120,29 +145,68 @@ app.post("/orders", (req, res) => {
   });
 });
 
-app.post("/seed", (req, res) => {
+app.post("/seed", async (req, res) => {
+  console.log("Seeding products...");
   const products = [
-    ["T-Shirt", "100% cotton, unisex", 19.99, 100],
-    ["Hoodie", "Warm and comfy", 39.99, 50],
-    ["Sneakers", "Lightweight running shoes", 59.99, 75],
+    ["Tshirt", "100% cotton, unisex", 19.99, 100, "/images/tshirt.jpg"],
+    ["Hoodie", "Warm and comfy", 39.99, 50, "/images/hoodie.jpg"],
+    ["Sneakers", "Lightweight running shoes", 59.99, 75, "/images/sneakers.jpg"],
   ];
 
   try {
-    const stmt = db.prepare(
-      `INSERT INTO products (name, description, price, stock) VALUES (?, ?, ?, ?)`
-    );
-    products.forEach((p) => stmt.run(p));
-    stmt.finalize((err) => {
-      if (err) {
-        console.error("Error seeding products:", err);
-        return res.status(500).json({ error: err.message });
-      }
-      res.json({ success: true, message: "Products seeded successfully" });
+    // First, clear existing products
+    await new Promise((resolve, reject) => {
+      db.run('DELETE FROM products', (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
     });
+
+    console.log("Existing products cleared");
+
+    // Insert new products
+    for (const product of products) {
+      await new Promise((resolve, reject) => {
+        db.run(
+          `INSERT INTO products (name, description, price, stock, image_url) VALUES (?, ?, ?, ?, ?)`,
+          product,
+          (err) => {
+            if (err) reject(err);
+            else resolve();
+          }
+        );
+      });
+    }
+
+    console.log("Products seeded successfully");
+    res.json({ success: true, message: "Products seeded successfully" });
   } catch (err) {
-    console.error("Error preparing statement:", err);
+    console.error("Error seeding products:", err);
     res.status(500).json({ error: err.message });
   }
+});
+
+app.post("/products", (req, res) => {
+  const { name, description, price, stock, image_url } = req.body;
+  
+  if (!name || !price || !stock) {
+    return res.status(400).json({ error: "Name, price, and stock are required" });
+  }
+
+  db.run(
+    `INSERT INTO products (name, description, price, stock, image_url) VALUES (?, ?, ?, ?, ?)`,
+    [name, description, price, stock, image_url],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({ 
+        success: true, 
+        message: "Product added successfully",
+        productId: this.lastID 
+      });
+    }
+  );
 });
 
 app.listen(PORT, () => {
@@ -184,6 +248,52 @@ app.post("/login", (req, res) => {
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ error: "Invalid credentials" });
 
-    res.json({ message: "Login successful", user_id: user.id });
+    res.json({ 
+      message: "Login successful", 
+      user_id: user.id,
+      is_admin: Boolean(user.is_admin)
+    });
   });
+});
+
+// Add admin check middleware
+const requireAdmin = (req, res, next) => {
+  const userId = req.headers['user-id'];
+  const isAdmin = req.headers['is-admin'];
+
+  if (!userId || !isAdmin) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  db.get(`SELECT is_admin FROM users WHERE id = ?`, [userId], (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!user || !user.is_admin) {
+      return res.status(403).json({ error: "Forbidden - Admin access required" });
+    }
+    next();
+  });
+};
+
+// Protect products POST endpoint
+app.post("/products", requireAdmin, (req, res) => {
+  const { name, description, price, stock, image_url } = req.body;
+  
+  if (!name || !price || !stock) {
+    return res.status(400).json({ error: "Name, price, and stock are required" });
+  }
+
+  db.run(
+    `INSERT INTO products (name, description, price, stock, image_url) VALUES (?, ?, ?, ?, ?)`,
+    [name, description, price, stock, image_url],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({ 
+        success: true, 
+        message: "Product added successfully",
+        productId: this.lastID 
+      });
+    }
+  );
 });

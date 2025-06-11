@@ -1,53 +1,45 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-
-import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import Cart from "./pages/Cart";
-import Checkout from "./pages/Checkout";
-import Register from "./pages/Register";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Checkout from "./pages/Checkout";
+import Admin from "./pages/Admin";
+import Navbar from "./components/Navbar";
+import { AuthProvider } from "./context/AuthContext";
+import { CartProvider } from "./context/CartContext";
+import ProtectedRoute from "./components/ProtectedRoute";
 
-export default function App() {
-  const [cart, setCart] = useState([]);
-  const [userId, setUserId] = useState(null);
-
-  useEffect(() => {
-    const storedUserId = localStorage.getItem("userId");
-    if (storedUserId) {
-      setUserId(storedUserId);
-    }
-  }, []);
-
+function App() {
   return (
-    <Router>
-      <div className="min-h-screen flex flex-col">
-        <Navbar
-          cartCount={cart.reduce((sum, item) => sum + item.quantity, 0)}
-          userId={userId}
-          setUserId={setUserId}
-        />
-        <main className="flex-grow p-4">
-          <Routes>
-            <Route path="/" element={<Home cart={cart} setCart={setCart} />} />
-            <Route
-              path="/cart"
-              element={<Cart cart={cart} setCart={setCart} />}
-            />
-            <Route
-              path="/checkout"
-              element={
-                <Checkout userId={userId} cart={cart} setCart={setCart} />
-              }
-            />
-            <Route
-              path="/register"
-              element={<Register setUserId={setUserId} />}
-            />
-            <Route path="/login" element={<Login setUserId={setUserId} />} />
-          </Routes>
-        </main>
-      </div>
-    </Router>
+    <AuthProvider>
+      <CartProvider>
+        <Router>
+          <div className="App min-h-screen bg-gray-50">
+            <Navbar />
+            <main className="container mx-auto px-4 py-8">
+              <Routes>
+                <Route path="/" element={<Home />} />
+                <Route path="/cart" element={<Cart />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/checkout" element={<Checkout />} />
+                <Route 
+                  path="/admin" 
+                  element={
+                    <ProtectedRoute>
+                      <Admin />
+                    </ProtectedRoute>
+                  } 
+                />
+              </Routes>
+            </main>
+          </div>
+        </Router>
+      </CartProvider>
+    </AuthProvider>
   );
 }
+
+export default App;

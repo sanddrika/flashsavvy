@@ -13,6 +13,9 @@ const PORT = 3000;
 app.use(express.json());
 app.use(express.static('public')); // Serve static files
 
+
+app.use("/",(req,res )=>{res.send("server is running")})
+app.listen(PORT, console.log(`server is running on port ${PORT}`))
 // CORS Middleware
 app.use((req, res, next) => {
   const allowedOrigins = ['http://localhost:3001', 'http://localhost:3002'];

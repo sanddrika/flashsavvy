@@ -13,12 +13,13 @@ const PORT = 3000;
 app.use(express.json());
 app.use(express.static('public')); // Serve static files
 
-
-app.use("/",(req,res )=>{res.send("server is running")})
-app.listen(PORT, console.log(`server is running on port ${PORT}`))
 // CORS Middleware
 app.use((req, res, next) => {
-  const allowedOrigins = ['http://localhost:3001', 'http://localhost:3002'];
+  const allowedOrigins = [
+    'http://localhost:3001',
+    'http://localhost:3002',
+    'https://flashsavvy.vercel.app'
+  ];
   const origin = req.headers.origin;
   
   if (allowedOrigins.includes(origin)) {
@@ -26,7 +27,7 @@ app.use((req, res, next) => {
   }
   
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, user-id, is-admin');
   res.header('Access-Control-Allow-Credentials', 'true');
   
   if (req.method === 'OPTIONS') {
@@ -34,12 +35,6 @@ app.use((req, res, next) => {
     return;
   }
   next();
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something broke!' });
 });
 
 // SQLite DB setup inside server folder
@@ -89,20 +84,22 @@ db.serialize(() => {
   )`);
 });
 
-// Routes
-app.get("/products", (req, res) => {
-  console.log("GET /products request received");
+// API Routes
+app.get("/api/products", (req, res) => {
+  console.log("GET /api/products request received");
+  console.log("Request headers:", req.headers);
+  
   db.all(`SELECT * FROM products`, [], (err, rows) => {
     if (err) {
-      console.error("Error fetching products:", err);
+      console.error("Database error fetching products:", err);
       return res.status(500).json({ error: err.message });
     }
     console.log("Products fetched successfully:", rows);
-    res.json({ success: true, data: rows });
+    res.json(rows);
   });
 });
 
-app.post("/orders", (req, res) => {
+app.post("/api/orders", (req, res) => {
   const { user_id, items } = req.body;
   if (!user_id || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ error: "Invalid order data" });
@@ -148,7 +145,92 @@ app.post("/orders", (req, res) => {
   });
 });
 
-app.post("/seed", async (req, res) => {
+app.post("/api/auth/register", async (req, res) => {
+  const { name, email, password } = req.body;
+  if (!name || !email || !password)
+    return res.status(400).json({ error: "All fields are required" });
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  db.run(
+    `INSERT INTO users (name, email, password) VALUES (?, ?, ?)`,
+    [name, email, hashedPassword],
+    function (err) {
+      if (err) {
+        if (err.message.includes("UNIQUE")) {
+          return res.status(400).json({ error: "Email already in use" });
+        }
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({ message: "User registered", user_id: this.lastID });
+    }
+  );
+});
+
+app.post("/api/auth/login", (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password)
+    return res.status(400).json({ error: "Email and password required" });
+
+  db.get(`SELECT * FROM users WHERE email = ?`, [email], async (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!user) return res.status(401).json({ error: "Invalid credentials" });
+
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ error: "Invalid credentials" });
+
+    res.json({ 
+      message: "Login successful", 
+      user_id: user.id,
+      is_admin: Boolean(user.is_admin)
+    });
+  });
+});
+
+// Add admin check middleware
+const requireAdmin = (req, res, next) => {
+  const userId = req.headers['user-id'];
+  const isAdmin = req.headers['is-admin'];
+
+  if (!userId || !isAdmin) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  db.get(`SELECT is_admin FROM users WHERE id = ?`, [userId], (err, user) => {
+    if (err) return res.status(500).json({ error: err.message });
+    if (!user || !user.is_admin) {
+      return res.status(403).json({ error: "Forbidden - Admin access required" });
+    }
+    next();
+  });
+};
+
+// Protect products POST endpoint
+app.post("/api/products", requireAdmin, (req, res) => {
+  const { name, description, price, stock, image_url } = req.body;
+  
+  if (!name || !price || !stock) {
+    return res.status(400).json({ error: "Name, price, and stock are required" });
+  }
+
+  db.run(
+    `INSERT INTO products (name, description, price, stock, image_url) VALUES (?, ?, ?, ?, ?)`,
+    [name, description, price, stock, image_url],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      res.json({ 
+        success: true, 
+        message: "Product added successfully",
+        productId: this.lastID 
+      });
+    }
+  );
+});
+
+// Seed products endpoint
+app.post("/api/seed", async (req, res) => {
   console.log("Seeding products...");
   const products = [
     ["Tshirt", "100% cotton, unisex", 19.99, 100, "/images/tshirt.jpg"],
@@ -189,114 +271,11 @@ app.post("/seed", async (req, res) => {
   }
 });
 
-app.post("/products", (req, res) => {
-  const { name, description, price, stock, image_url } = req.body;
-  
-  if (!name || !price || !stock) {
-    return res.status(400).json({ error: "Name, price, and stock are required" });
-  }
-
-  db.run(
-    `INSERT INTO products (name, description, price, stock, image_url) VALUES (?, ?, ?, ?, ?)`,
-    [name, description, price, stock, image_url],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      res.json({ 
-        success: true, 
-        message: "Product added successfully",
-        productId: this.lastID 
-      });
-    }
-  );
+// Health check endpoint
+app.get("/", (req, res) => {
+  res.send("Server is running");
 });
 
 app.listen(PORT, () => {
   console.log(`FlashSavvy backend running at http://localhost:${PORT}`);
-});
-// Register route
-app.post("/register", async (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password)
-    return res.status(400).json({ error: "All fields are required" });
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  db.run(
-    `INSERT INTO users (name, email, password) VALUES (?, ?, ?)`,
-    [name, email, hashedPassword],
-    function (err) {
-      if (err) {
-        if (err.message.includes("UNIQUE")) {
-          return res.status(400).json({ error: "Email already in use" });
-        }
-        return res.status(500).json({ error: err.message });
-      }
-      res.json({ message: "User registered", user_id: this.lastID });
-    }
-  );
-});
-
-// Login route
-app.post("/login", (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password)
-    return res.status(400).json({ error: "Email and password required" });
-
-  db.get(`SELECT * FROM users WHERE email = ?`, [email], async (err, user) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!user) return res.status(401).json({ error: "Invalid credentials" });
-
-    const valid = await bcrypt.compare(password, user.password);
-    if (!valid) return res.status(401).json({ error: "Invalid credentials" });
-
-    res.json({ 
-      message: "Login successful", 
-      user_id: user.id,
-      is_admin: Boolean(user.is_admin)
-    });
-  });
-});
-
-// Add admin check middleware
-const requireAdmin = (req, res, next) => {
-  const userId = req.headers['user-id'];
-  const isAdmin = req.headers['is-admin'];
-
-  if (!userId || !isAdmin) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  db.get(`SELECT is_admin FROM users WHERE id = ?`, [userId], (err, user) => {
-    if (err) return res.status(500).json({ error: err.message });
-    if (!user || !user.is_admin) {
-      return res.status(403).json({ error: "Forbidden - Admin access required" });
-    }
-    next();
-  });
-};
-
-// Protect products POST endpoint
-app.post("/products", requireAdmin, (req, res) => {
-  const { name, description, price, stock, image_url } = req.body;
-  
-  if (!name || !price || !stock) {
-    return res.status(400).json({ error: "Name, price, and stock are required" });
-  }
-
-  db.run(
-    `INSERT INTO products (name, description, price, stock, image_url) VALUES (?, ?, ?, ?, ?)`,
-    [name, description, price, stock, image_url],
-    function(err) {
-      if (err) {
-        return res.status(500).json({ error: err.message });
-      }
-      res.json({ 
-        success: true, 
-        message: "Product added successfully",
-        productId: this.lastID 
-      });
-    }
-  );
 });

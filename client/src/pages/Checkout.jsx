@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { ordersAPI } from '../api/config';
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -28,7 +28,7 @@ const Checkout = () => {
         quantity: item.quantity
       }));
 
-      await axios.post("http://localhost:3000/orders", {
+      await ordersAPI.create({
         user_id: user.id,
         items: orderItems
       });

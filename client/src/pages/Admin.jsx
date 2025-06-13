@@ -1,21 +1,31 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { productsAPI } from '../api/config';
 
 const Admin = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
-  const [productData, setProductData] = useState({
+  const [formData, setFormData] = useState({
     name: '',
     description: '',
     price: '',
-    stock: ''
+    stock: '',
+    image_url: ''
   });
-  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+
+  // Redirect if not admin
+  React.useEffect(() => {
+    if (!user || !user.isAdmin) {
+      navigate('/');
+    }
+  }, [user, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setProductData(prev => ({
+    setFormData(prev => ({
       ...prev,
       [name]: value
     }));
@@ -23,117 +33,136 @@ const Admin = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+    setSuccess('');
+
     try {
-      const response = await axios.post('http://localhost:3000/products', 
-        {
-          ...productData,
-          price: parseFloat(productData.price),
-          stock: parseInt(productData.stock)
-        },
-        {
-          headers: {
-            'user-id': user.id,
-            'is-admin': user.is_admin
-          }
-        }
-      );
-      
-      if (response.data.success) {
-        setMessage('Product added successfully!');
-        setProductData({
-          name: '',
-          description: '',
-          price: '',
-          stock: ''
-        });
-        setError('');
-      }
+      const productData = {
+        ...formData,
+        price: parseFloat(formData.price),
+        stock: parseInt(formData.stock, 10)
+      };
+
+      await productsAPI.create(productData);
+      setSuccess('Product added successfully!');
+      setFormData({
+        name: '',
+        description: '',
+        price: '',
+        stock: '',
+        image_url: ''
+      });
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to add product');
-      setMessage('');
+      setError(err.response?.data?.error || 'Failed to add product. Please try again.');
     }
   };
 
+  if (!user || !user.isAdmin) {
+    return null;
+  }
+
   return (
-    <div className="min-h-screen bg-gray-100 py-6 flex flex-col justify-center sm:py-12">
-      <div className="relative py-3 sm:max-w-xl sm:mx-auto">
-        <div className="relative px-4 py-10 bg-white mx-8 md:mx-0 shadow rounded-3xl sm:p-10">
-          <div className="max-w-md mx-auto">
-            <div className="divide-y divide-gray-200">
-              <div className="py-8 text-base leading-6 space-y-4 text-gray-700 sm:text-lg sm:leading-7">
-                <h2 className="text-2xl font-bold mb-8 text-center text-gray-800">Add New Product</h2>
-                
-                {message && <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-                  <span className="block sm:inline">{message}</span>
-                </div>}
-                
-                {error && <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
-                  <span className="block sm:inline">{error}</span>
-                </div>}
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8 text-center">Admin Dashboard</h1>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Product Name</label>
-                    <input
-                      type="text"
-                      name="name"
-                      value={productData.name}
-                      onChange={handleChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      required
-                    />
-                  </div>
+      <div className="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+        <h2 className="text-xl font-semibold mb-4">Add New Product</h2>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Description</label>
-                    <textarea
-                      name="description"
-                      value={productData.description}
-                      onChange={handleChange}
-                      rows="3"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Price</label>
-                    <input
-                      type="number"
-                      name="price"
-                      value={productData.price}
-                      onChange={handleChange}
-                      step="0.01"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Stock</label>
-                    <input
-                      type="number"
-                      name="stock"
-                      value={productData.stock}
-                      onChange={handleChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-                      required
-                    />
-                  </div>
-
-                  <div className="pt-4">
-                    <button
-                      type="submit"
-                      className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                    >
-                      Add Product
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
+        {error && (
+          <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+            {error}
           </div>
-        </div>
+        )}
+
+        {success && (
+          <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="name">
+              Name
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              required
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="description">
+              Description
+            </label>
+            <textarea
+              id="description"
+              name="description"
+              value={formData.description}
+              onChange={handleChange}
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="price">
+              Price
+            </label>
+            <input
+              type="number"
+              id="price"
+              name="price"
+              value={formData.price}
+              onChange={handleChange}
+              required
+              min="0"
+              step="0.01"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            />
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="stock">
+              Stock
+            </label>
+            <input
+              type="number"
+              id="stock"
+              name="stock"
+              value={formData.stock}
+              onChange={handleChange}
+              required
+              min="0"
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            />
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="image_url">
+              Image URL
+            </label>
+            <input
+              type="text"
+              id="image_url"
+              name="image_url"
+              value={formData.image_url}
+              onChange={handleChange}
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="w-full bg-indigo-600 text-white font-bold py-2 px-4 rounded hover:bg-indigo-700 focus:outline-none focus:shadow-outline"
+          >
+            Add Product
+          </button>
+        </form>
       </div>
     </div>
   );

@@ -1,12 +1,11 @@
 {
   "name": "server",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "FlashSavvy serverless backend",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "dev": "vercel dev",
+    "deploy": "vercel deploy"
   },
   "keywords": [],
   "author": "",
@@ -15,5 +14,8 @@
     "bcrypt": "^6.0.0",
     "express": "^5.1.0",
     "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "vercel": "^32.0.0"
   }
 }

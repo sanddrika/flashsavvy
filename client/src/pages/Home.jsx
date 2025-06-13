@@ -2,6 +2,9 @@ import React, { useEffect, useState } from "react";
 import { useCart } from '../context/CartContext';
 import ProductCard from "../components/ProductCard";
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { productsAPI } from '../api/config';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Home = () => {
   const [products, setProducts] = useState([]);
@@ -9,34 +12,24 @@ const Home = () => {
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const { addToCart } = useCart();
+  const navigate = useNavigate();
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        console.log("Fetching products...");
-        const response = await fetch("http://localhost:3000/products", {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data && data.success && Array.isArray(data.data)) {
-          setProducts(data.data);
-        } else {
-          console.error("Invalid response format:", data);
-          setError("Failed to load products - invalid response format");
-        }
+        console.log('Fetching products...');
+        const response = await productsAPI.getAll();
+        console.log('Products response:', response);
+        setProducts(response.data);
       } catch (err) {
-        console.error("Failed to fetch products:", err);
-        setError(err.message || "Failed to load products");
+        console.error('Error fetching products:', err);
+        console.error('Error details:', {
+          message: err.message,
+          response: err.response?.data,
+          status: err.response?.status
+        });
+        setError('Failed to fetch products. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -49,6 +42,14 @@ const Home = () => {
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     product.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleAddToCart = (product) => {
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    addToCart(product);
+  };
 
   if (loading) {
     return (
@@ -119,10 +120,10 @@ const Home = () => {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {filteredProducts.map((product) => (
-              <div key={product.product_id} className="transform hover:-translate-y-1 transition-transform duration-200">
+              <div key={product.id} className="transform hover:-translate-y-1 transition-transform duration-200">
                 <ProductCard
                   product={product}
-                  onAddToCart={() => addToCart(product)}
+                  onAddToCart={() => handleAddToCart(product)}
                 />
               </div>
             ))}

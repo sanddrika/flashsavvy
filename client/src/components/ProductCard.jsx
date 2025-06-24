@@ -3,12 +3,11 @@ import { ShoppingBagIcon } from '@heroicons/react/24/outline';
 
 const ProductCard = ({ product, onAddToCart }) => {
   const price = typeof product.price === 'string' ? parseFloat(product.price) : product.price;
-  
-  // Get the image URL based on the product name
+
   const getImageUrl = (productName) => {
     const name = productName
       .toLowerCase()
-      .replace(/[^a-z0-9]/g, '') // Remove all special characters and spaces
+      .replace(/[^a-z0-9]/g, '') 
       .trim();
     console.log('Image path:', `/images/${name}.jpg`); // Debug log
     return `/images/${name}.jpg`;

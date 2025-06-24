@@ -16,7 +16,6 @@ const Admin = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  // Redirect if not admin
   React.useEffect(() => {
     if (!user || !user.isAdmin) {
       navigate('/');
